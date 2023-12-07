@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -18,6 +19,8 @@ import (
 	"github.com/kr/pretty"
 	"golang.org/x/exp/constraints"
 )
+
+const year = 2023
 
 var solutions = make(map[int][]func(*problemContext))
 
@@ -59,6 +62,7 @@ func main() {
 	cpuProfile := flag.String("cpuprofile", "", "write CPU profile to `file`")
 	printTimings := flag.Bool("t", false, "print timings")
 	readStdin := flag.Bool("stdin", false, "read from stdin instead of default file")
+	downloadInput := flag.Bool("dlinput", false, "download the input and store as <day>.txt")
 	flag.Parse()
 
 	if *printTimings && *cpuProfile != "" {
@@ -66,6 +70,10 @@ func main() {
 	}
 	if flag.NArg() != 1 {
 		log.Fatalf("Usage: %s [flags] problem", os.Args[0])
+	}
+	if *downloadInput {
+		downloadProblemInput(flag.Arg(0))
+		return
 	}
 	problem, solNumber, err := parseProblem(flag.Arg(0))
 	if err != nil {
@@ -106,6 +114,61 @@ func main() {
 	ctx.timings.done = time.Now()
 	if *printTimings {
 		ctx.printTimings()
+	}
+}
+
+func downloadProblemInput(day string) {
+	n, err := strconv.Atoi(day)
+	if err != nil {
+		log.Fatalf("Bad problem number %q", day)
+	}
+	if n < 0 || n > 25 {
+		log.Fatalf("Day number %d out of range", n)
+	}
+	day = fmt.Sprintf("%02d", n)
+
+	cookieText, err := os.ReadFile("sessioncookie.txt")
+	if err != nil {
+		log.Fatalln("Error reading session cookie:", err)
+	}
+	url := fmt.Sprintf("https://adventofcode.com/%d/day/%d/input", year, n)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		panic(err)
+	}
+	req.AddCookie(&http.Cookie{
+		Name:  "session",
+		Value: strings.TrimSpace(string(cookieText)),
+	})
+	req.Header.Set(
+		"User-Agent",
+		fmt.Sprintf("github.com/cespare/aoc%d by cespare@gmail.com", year),
+	)
+
+	f, err := os.OpenFile(day+".txt", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if err != nil {
+		log.Fatalln("Error opening input file:", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatalln("Error downloading input:", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		log.Printf("Non-200 status response (%d)", resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		if err == nil && len(body) > 0 {
+			log.Printf("Response:\n%s", body)
+		}
+		os.Exit(1)
+	}
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		log.Fatalln("Error writing input file:", err)
+	}
+
+	if err := f.Close(); err != nil {
+		log.Fatalln("Error writing input file:", err)
 	}
 }
 
