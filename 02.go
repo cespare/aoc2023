@@ -10,15 +10,13 @@ func init() {
 }
 
 func problem2(ctx *problemContext) {
-	var games []*cubeGame
-	scanner := ctx.scanner()
-	for scanner.scan() {
-		g, ok := parseCubeGame(scanner.text())
+	games := scanSlice(ctx, func(s string) *cubeGame {
+		g, ok := parseCubeGame(s)
 		if !ok {
-			log.Fatalf("Bad game %q", scanner.text())
+			log.Fatalf("Bad game %q", s)
 		}
-		games = append(games, g)
-	}
+		return g
+	})
 	ctx.reportLoad()
 
 	var part1Score int64

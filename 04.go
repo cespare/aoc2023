@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"strings"
 )
@@ -11,20 +10,17 @@ func init() {
 }
 
 func problem4(ctx *problemContext) {
-	var cs []*card
-	scanner := ctx.scanner()
-	for scanner.scan() {
-		c, ok := parseCard(scanner.text())
+	cs := scanSlice(ctx, func(s string) *card {
+		c, ok := parseCard(s)
 		if !ok {
-			log.Fatalf("Bad card: %q", scanner.text())
+			log.Fatalf("Bad card: %q", s)
 		}
-		cs = append(cs, c)
-	}
+		return c
+	})
 	ctx.reportLoad()
 
 	var part1Score int64
 	for _, c := range cs {
-		fmt.Println(c.score())
 		part1Score += c.score()
 	}
 	ctx.reportPart1(part1Score)

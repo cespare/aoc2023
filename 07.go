@@ -10,19 +10,17 @@ func init() {
 }
 
 func problem7(ctx *problemContext) {
-	var hbs []handBid
-	scanner := ctx.scanner()
-	for scanner.scan() {
-		hand, bidStr, ok := strings.Cut(scanner.text(), " ")
+	hbs := scanSlice(ctx, func(s string) handBid {
+		hand, bidStr, ok := strings.Cut(s, " ")
 		if !ok {
 			panic("bad")
 		}
-		hb := handBid{
+		return handBid{
 			hand: pokerHand([]byte(hand)),
 			bid:  parseInt(bidStr),
 		}
-		hbs = append(hbs, hb)
-	}
+	})
+	ctx.reportLoad()
 
 	slices.SortFunc(hbs, func(hb0, hb1 handBid) int {
 		return hb0.hand.cmp(hb1.hand)

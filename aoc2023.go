@@ -267,6 +267,15 @@ func (ctx *problemContext) int64s() []int64 {
 	return ns
 }
 
+func (ctx *problemContext) lines() []string {
+	var lines []string
+	s := ctx.scanner()
+	for s.scan() {
+		lines = append(lines, s.text())
+	}
+	return lines
+}
+
 func (ctx *problemContext) readAll() []byte {
 	b, err := io.ReadAll(ctx.f)
 	if err != nil {
