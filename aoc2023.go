@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -557,13 +558,35 @@ func (g *grid[E]) at(v vec2) E {
 	return g.g[v.y][v.x]
 }
 
-func (g *grid[E]) forEach(f func(v vec2, e E)) {
+func (g *grid[E]) set(v vec2, e E) {
+	g.g[v.y][v.x] = e
+}
+
+func (g *grid[E]) forEach(f func(v vec2, e E) bool) {
 	for y := int64(0); y < g.rows; y++ {
 		for x := int64(0); x < g.cols; x++ {
 			v := vec2{x, y}
-			f(v, g.at(v))
+			if !f(v, g.at(v)) {
+				return
+			}
 		}
 	}
+}
+
+func (g *grid[E]) insertCol(x int64, e E) {
+	g.cols++
+	for y := int64(0); y < g.rows; y++ {
+		g.g[y] = slices.Insert(g.g[y], int(x), e)
+	}
+}
+
+func (g *grid[E]) insertRow(y int64, e E) {
+	g.rows++
+	row := make([]E, g.cols)
+	for y := range row {
+		row[y] = e
+	}
+	g.g = slices.Insert(g.g, int(y), row)
 }
 
 // Extra slice stuff not in slices.
