@@ -352,6 +352,10 @@ func (v vec2) mul(m int64) vec2 {
 	return vec2{v.x * m, v.y * m}
 }
 
+func (v vec2) eltMul(v1 vec2) vec2 {
+	return vec2{v.x * v1.x, v.y * v1.y}
+}
+
 func (v vec2) mag() int64 {
 	return abs(v.x) + abs(v.y)
 }
@@ -587,6 +591,18 @@ func (g *grid[E]) insertRow(y int64, e E) {
 		row[y] = e
 	}
 	g.g = slices.Insert(g.g, int(y), row)
+}
+
+func (g *grid[E]) clone() *grid[E] {
+	g1 := &grid[E]{
+		g:    make([][]E, len(g.g)),
+		rows: g.rows,
+		cols: g.cols,
+	}
+	for i, row := range g.g {
+		g1.g[i] = slices.Clone(row)
+	}
+	return g1
 }
 
 // Extra slice stuff not in slices.
