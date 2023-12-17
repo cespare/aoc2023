@@ -3,6 +3,7 @@ module github.com/cespare/aoc2023
 go 1.21.0
 
 require (
+	github.com/cespare/next v0.0.1
 	github.com/kr/pretty v0.3.1
 	golang.org/x/exp v0.0.0-20231127185646-65229373498e
 )
