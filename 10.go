@@ -66,6 +66,23 @@ const (
 	west
 )
 
+func (c cardinal) GoString() string {
+	var ss []string
+	if c&north != 0 {
+		ss = append(ss, "north")
+	}
+	if c&east != 0 {
+		ss = append(ss, "east")
+	}
+	if c&south != 0 {
+		ss = append(ss, "south")
+	}
+	if c&west != 0 {
+		ss = append(ss, "west")
+	}
+	return strings.Join(ss, "|")
+}
+
 func cardToVec(c cardinal) vec2 {
 	switch c {
 	case north:
