@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -183,167 +182,121 @@ func (a *avalanche) part1() int64 {
 	return total
 }
 
-type rangeSet struct {
-	ranges []rnge // non-overlapping, ordered
-}
-
-type rnge struct {
+type machineInterval struct {
 	start, end int64 // inclusive
 }
 
-func newRangeSet(start, end int64) *rangeSet {
-	return &rangeSet{
-		ranges: []rnge{{start, end}},
+func (iv *machineInterval) count() int64 {
+	return iv.end - iv.start + 1
+}
+
+func (iv *machineInterval) clearGT(n int64) {
+	switch {
+	case n >= iv.end:
+	case n < iv.start:
+		iv.end = iv.start
+	default:
+		iv.end = n
 	}
 }
 
-func (rs *rangeSet) clone() *rangeSet {
-	return &rangeSet{
-		ranges: slices.Clone(rs.ranges),
+func (iv *machineInterval) clearGEQ(n int64) {
+	switch {
+	case n > iv.end:
+	case n <= iv.start:
+		iv.end = iv.start
+	default:
+		iv.end = n - 1
 	}
 }
 
-func (rs *rangeSet) count() int64 {
-	var total int64
-	for _, r := range rs.ranges {
-		total += r.end - r.start + 1
-	}
-	return total
-}
-
-func (rs *rangeSet) clearGT(n int64) {
-	for i, r := range rs.ranges {
-		if n >= r.end {
-			continue
-		}
-		if n < r.start {
-			rs.ranges = rs.ranges[:i]
-			return
-		}
-		rs.ranges[i].end = n
-		rs.ranges = rs.ranges[:i+1]
-		return
+func (iv *machineInterval) clearLT(n int64) {
+	switch {
+	case n <= iv.start:
+	case n > iv.end:
+		iv.start = iv.end
+	default:
+		iv.start = n
 	}
 }
 
-func (rs *rangeSet) clearGEQ(n int64) {
-	for i, r := range rs.ranges {
-		if n > r.end {
-			continue
-		}
-		if n <= r.start {
-			rs.ranges = rs.ranges[:i]
-			return
-		}
-		rs.ranges[i].end = n - 1
-		rs.ranges = rs.ranges[:i+1]
-		return
+func (iv *machineInterval) clearLEQ(n int64) {
+	switch {
+	case n < iv.start:
+	case n >= iv.end:
+		iv.start = iv.end
+	default:
+		iv.start = n + 1
 	}
 }
 
-func (rs *rangeSet) clearLT(n int64) {
-	for i := len(rs.ranges) - 1; i >= 0; i-- {
-		r := rs.ranges[i]
-		if n <= r.start {
-			continue
-		}
-		if n > r.end {
-			rs.ranges = rs.ranges[i+1:]
-			return
-		}
-		rs.ranges[i].start = n
-		rs.ranges = rs.ranges[i:]
-		return
+type partIntervals struct {
+	x, m, a, s machineInterval
+}
+
+func newPartRanges() *partIntervals {
+	return &partIntervals{
+		x: machineInterval{1, 4000},
+		m: machineInterval{1, 4000},
+		a: machineInterval{1, 4000},
+		s: machineInterval{1, 4000},
 	}
 }
 
-func (rs *rangeSet) clearLEQ(n int64) {
-	for i := len(rs.ranges) - 1; i >= 0; i-- {
-		r := rs.ranges[i]
-		if n < r.start {
-			continue
-		}
-		if n >= r.end {
-			rs.ranges = rs.ranges[i+1:]
-			return
-		}
-		rs.ranges[i].start = n + 1
-		rs.ranges = rs.ranges[i:]
-		return
-	}
+func (pi *partIntervals) clone() *partIntervals {
+	pi1 := *pi
+	return &pi1
 }
 
-type partRanges struct {
-	x, m, a, s *rangeSet
+func (pi *partIntervals) valid() bool {
+	return pi.x.count() > 0 && pi.m.count() > 0 && pi.a.count() > 0 && pi.s.count() > 0
 }
 
-func newPartRanges() partRanges {
-	return partRanges{
-		x: newRangeSet(1, 4000),
-		m: newRangeSet(1, 4000),
-		a: newRangeSet(1, 4000),
-		s: newRangeSet(1, 4000),
-	}
+func (pi *partIntervals) combos() int64 {
+	return pi.x.count() * pi.m.count() * pi.a.count() * pi.s.count()
 }
 
-func (pb partRanges) clone() partRanges {
-	return partRanges{
-		x: pb.x.clone(),
-		m: pb.m.clone(),
-		a: pb.a.clone(),
-		s: pb.s.clone(),
-	}
-}
-
-func (pb partRanges) valid() bool {
-	return pb.x.count() > 0 && pb.m.count() > 0 && pb.a.count() > 0 && pb.s.count() > 0
-}
-
-func (pb partRanges) combos() int64 {
-	return pb.x.count() * pb.m.count() * pb.a.count() * pb.s.count()
-}
-
-func (a *avalanche) multiExec(coord workflowCoord, pb partRanges) int64 {
-	if !pb.valid() {
+func (a *avalanche) multiExec(coord workflowCoord, pi *partIntervals) int64 {
+	if !pi.valid() {
 		return 0
 	}
 	r := a.flow[coord.name].rules[coord.i]
 	var combos int64
 	if r.v != "" {
-		pbNeg := pb.clone()
-		var rs, rsNeg *rangeSet
+		piNeg := pi.clone()
+		var iv, ivNeg *machineInterval
 		switch r.v {
 		case "x":
-			rs = pb.x
-			rsNeg = pbNeg.x
+			iv = &pi.x
+			ivNeg = &piNeg.x
 		case "m":
-			rs = pb.m
-			rsNeg = pbNeg.m
+			iv = &pi.m
+			ivNeg = &piNeg.m
 		case "a":
-			rs = pb.a
-			rsNeg = pbNeg.a
+			iv = &pi.a
+			ivNeg = &piNeg.a
 		case "s":
-			rs = pb.s
-			rsNeg = pbNeg.s
+			iv = &pi.s
+			ivNeg = &piNeg.s
 		}
 		if r.lt {
-			rs.clearGEQ(r.targ)
-			rsNeg.clearLT(r.targ)
+			iv.clearGEQ(r.targ)
+			ivNeg.clearLT(r.targ)
 		} else {
-			rs.clearLEQ(r.targ)
-			rsNeg.clearGT(r.targ)
+			iv.clearLEQ(r.targ)
+			ivNeg.clearGT(r.targ)
 		}
 		coordNeg := coord
 		coordNeg.i++
-		combos += a.multiExec(coordNeg, pbNeg)
+		combos += a.multiExec(coordNeg, piNeg)
 	}
 	switch r.dest {
 	case "R":
 	case "A":
-		combos += pb.combos()
+		combos += pi.combos()
 	default:
 		coord := workflowCoord{r.dest, 0}
-		combos += a.multiExec(coord, pb)
+		combos += a.multiExec(coord, pi)
 	}
 	return combos
 }
