@@ -14,7 +14,7 @@ func problem23(ctx *problemContext) {
 	ctx.reportLoad()
 
 	ctx.reportPart1(h.part1())
-	ctx.reportPart1(h.part2())
+	ctx.reportPart2(h.part2())
 }
 
 type hike struct {
@@ -96,19 +96,19 @@ func (h *hike) longest(v vec2, seen map[vec2]struct{}) int {
 }
 
 type hikeSegment struct {
-	n   int
-	end vec2 // typically a junction, but could also be endpoint (or dead end)
+	n      int
+	end    vec2 // typically a junction, but could also be endpoint (or dead end)
+	endIdx int  // index in junction slice
 }
 
 type hikeSegmentGraph struct {
-	junctions map[vec2][]*hikeSegment
+	junctions [][]*hikeSegment
 	start     *hikeSegment
 }
 
 func (h *hike) buildSegmentGraph() *hikeSegmentGraph {
-	g := &hikeSegmentGraph{
-		junctions: make(map[vec2][]*hikeSegment),
-	}
+	junctions := make(map[vec2][]*hikeSegment)
+	var g hikeSegmentGraph
 	h.g.forEach(func(v vec2, c byte) bool {
 		if c != '.' {
 			return true
@@ -120,16 +120,38 @@ func (h *hike) buildSegmentGraph() *hikeSegmentGraph {
 			}
 		}
 		if numNeighbors > 2 {
-			g.junctions[v] = nil
+			junctions[v] = nil
 		}
 		return true
 	})
-	for v := range g.junctions {
-		h.fillJunction(v, g.junctions)
+	for v := range junctions {
+		h.fillJunction(v, junctions)
 	}
-	g.start = h.findSegment(h.start, g.junctions)
+	g.start = h.findSegment(h.start, junctions)
 	g.start.n-- // starting point doesn't count
-	return g
+
+	// Assign bitset indices to each junction.
+	junctionIdx := make(map[vec2]int)
+	for v, segs := range junctions {
+		junctionIdx[v] = len(g.junctions)
+		g.junctions = append(g.junctions, segs)
+		if len(g.junctions) > 64 {
+			panic("too many junctions")
+		}
+	}
+	// Tack on indices for start and end.
+	junctionIdx[h.start] = len(g.junctions)
+	g.junctions = append(g.junctions, nil)
+	junctionIdx[h.end] = len(g.junctions)
+	g.junctions = append(g.junctions, nil)
+	for _, segs := range g.junctions {
+		for _, seg := range segs {
+			seg.endIdx = junctionIdx[seg.end]
+		}
+	}
+	g.start.endIdx = junctionIdx[g.start.end]
+
+	return &g
 }
 
 func (h *hike) fillJunction(v vec2, junctions map[vec2][]*hikeSegment) {
@@ -177,24 +199,35 @@ searchLoop:
 
 func (h *hike) part2() int {
 	g := h.buildSegmentGraph()
-	return h.longest2(g, g.start, make(map[vec2]struct{}))
-}
 
-func (h *hike) longest2(g *hikeSegmentGraph, seg *hikeSegment, seen map[vec2]struct{}) int {
-	if seg.end == h.end {
-		return seg.n
+	var best int
+	st := hikeSearchState{
+		seg:  g.start,
+		seen: 0,
 	}
-	if _, ok := seen[seg.end]; ok {
-		return -1
-	}
-	seen[seg.end] = struct{}{}
-	best := -1
-	for _, next := range g.junctions[seg.end] {
-		best = max(best, h.longest2(g, next, seen))
-	}
-	delete(seen, seg.end)
-	if best >= 0 {
-		best += 1 + seg.n
+	stk := []hikeSearchState{st}
+	for len(stk) > 0 {
+		st := StackPop(&stk)
+		n := st.n + st.seg.n
+		if st.seg.end == h.end {
+			best = max(best, n)
+			continue
+		}
+		st.n = n + 1 // count junction
+		st.seen |= uint64(1) << st.seg.endIdx
+		for _, next := range g.junctions[st.seg.endIdx] {
+			if st.seen&(uint64(1)<<next.endIdx) > 0 {
+				continue
+			}
+			st.seg = next
+			StackPush(&stk, st)
+		}
 	}
 	return best
+}
+
+type hikeSearchState struct {
+	n    int
+	seg  *hikeSegment
+	seen uint64
 }
